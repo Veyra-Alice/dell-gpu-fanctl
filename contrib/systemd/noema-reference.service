@@ -1,0 +1,15 @@
+[Unit]
+Description=GPU-aware Dell DAPC fan offset controller
+Wants=nvidia-smi.service
+After=network.target nvidia-smi.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/veyra-gpu-fanctl --target-temp 80 --model-match "RTX 2080 Ti" --model-match "NVIDIA A2"
+Restart=always
+RestartSec=2
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
