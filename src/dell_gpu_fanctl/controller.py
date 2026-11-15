@@ -114,9 +114,13 @@ def is_active_flag(value: str) -> bool:
     return value.strip().lower() == "active"
 
 
-def parse_gpus(output: str, model_matches: Sequence[str]) -> list[Gpu]:
+def parse_gpus(
+    output: str, model_matches: Sequence[str], *, all_gpus: bool = False
+) -> list[Gpu]:
     expected = [value.strip() for value in model_matches if value.strip()]
-    if not expected:
+    if all_gpus and expected:
+        raise ValueError("all-GPU monitoring cannot be combined with model matches")
+    if not all_gpus and not expected:
         raise ValueError("at least one GPU model match is required")
     found = {value: False for value in expected}
     matches: list[Gpu] = []
@@ -127,7 +131,7 @@ def parse_gpus(output: str, model_matches: Sequence[str]) -> list[Gpu]:
             raise ValueError(f"unexpected nvidia-smi field count: {len(row)}")
         uuid, index, name, temperature, utilisation, power, hw_slow, sw_slow = row
         matched = [value for value in expected if value.lower() in name.lower()]
-        if not matched:
+        if not all_gpus and not matched:
             continue
         for value in matched:
             found[value] = True
@@ -145,6 +149,8 @@ def parse_gpus(output: str, model_matches: Sequence[str]) -> list[Gpu]:
     missing = [value for value, present in found.items() if not present]
     if missing:
         raise ValueError(f"no GPU matched expected model(s): {', '.join(missing)}")
+    if not matches:
+        raise ValueError("no GPUs returned by nvidia-smi")
     return matches
 
 
@@ -223,7 +229,7 @@ class Controller:
             ]
         )
         return summarise(
-            parse_gpus(output, self.args.model_match),
+            parse_gpus(output, self.args.model_match, all_gpus=self.args.all_gpus),
             self.args.utilisation_floor,
             self.args.power_floor,
         )
@@ -312,18 +318,26 @@ def arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--verify-seconds", type=float, default=60.0)
     parser.add_argument("--utilisation-floor", type=int, default=10)
     parser.add_argument("--power-floor", type=float, default=50.0)
-    parser.add_argument(
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
         "--model-match",
         action="append",
         default=None,
         help="required GPU model substring; repeat to monitor multiple models",
+    )
+    selection.add_argument(
+        "--all-gpus",
+        action="store_true",
+        help="monitor every NVIDIA GPU reported by nvidia-smi",
     )
     parser.add_argument("--nvidia-smi", default="/usr/bin/nvidia-smi")
     parser.add_argument("--racadm", default="/opt/dell/srvadmin/sbin/racadm")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args(argv)
-    if args.model_match is None:
+    if args.all_gpus:
+        args.model_match = []
+    elif args.model_match is None:
         args.model_match = ["RTX 2080 Ti"]
     return args
 
