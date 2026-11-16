@@ -1,0 +1,15 @@
+[Unit]
+Description=Dell GPU fan telemetry collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dell-gpu-fanctl-collector --config /etc/dell-gpu-fanctl/collector.json
+Restart=always
+RestartSec=3
+User=root
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

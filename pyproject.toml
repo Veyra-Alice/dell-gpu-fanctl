@@ -4,12 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dell-gpu-fanctl"
-version = "0.1.0"
+version = "0.2.0"
 description = "GPU-aware Dell DAPC fan offset controller"
+license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.9"
 
 [project.scripts]
-dell-gpu-fanctl = "dell_gpu_fanctl.controller:main"
+dell-gpu-fanctl-server = "dell_gpu_fanctl.server:main"
+dell-gpu-fanctl-collector = "dell_gpu_fanctl.collector:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

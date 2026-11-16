@@ -1,0 +1,8 @@
+{
+  "controller_url": "https://pve-host.example.org:9443",
+  "server_ca_file": "/etc/dell-gpu-fanctl/server.crt",
+  "token_file": "/etc/dell-gpu-fanctl/client.token",
+  "nvidia_smi": "/usr/bin/nvidia-smi",
+  "gpu_uuids": ["GPU-REPLACE-ME"],
+  "interval_seconds": 5
+}

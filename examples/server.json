@@ -1,0 +1,17 @@
+{
+  "listen_address": "192.0.2.10",
+  "listen_port": 9443,
+  "tls_cert_file": "/etc/dell-gpu-fanctl/server.crt",
+  "tls_key_file": "/etc/dell-gpu-fanctl/server.key",
+  "racadm": "/opt/dell/srvadmin/sbin/racadm",
+  "proxmox_node": "pve-host",
+  "expected_fans": ["System Board Fan1", "System Board Fan2", "System Board Fan3", "System Board Fan4", "System Board Fan5", "System Board Fan6"],
+  "inlet_limit_c": 40,
+  "minimum_level": "MAX",
+  "stale_seconds": 15,
+  "lower_delay_seconds": 120,
+  "clients": [
+    {"name": "gpu-guest", "token_file": "/etc/dell-gpu-fanctl/gpu-guest.token", "vm_id": 100,
+     "gpu_uuids": ["GPU-REPLACE-ME"], "target_temp": 80}
+  ]
+}

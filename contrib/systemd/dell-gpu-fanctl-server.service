@@ -1,0 +1,19 @@
+[Unit]
+Description=Dell GPU fan controller host service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStartPre=/usr/local/bin/dell-gpu-fanctl-server --config /etc/dell-gpu-fanctl/server.json --force-max
+ExecStart=/usr/local/bin/dell-gpu-fanctl-server --config /etc/dell-gpu-fanctl/server.json --enable-control
+ExecStopPost=/usr/local/bin/dell-gpu-fanctl-server --config /etc/dell-gpu-fanctl/server.json --force-max
+Restart=on-failure
+RestartSec=3
+WatchdogSec=90
+User=root
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
