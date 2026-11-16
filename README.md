@@ -41,6 +41,12 @@ UUIDs. Remove `vm_id` for a client that should always be considered running.
 An empty `clients` list is valid; a configured client must list at least one
 GPU. Never reuse a token across clients.
 
+A client may set `active_minimum_level` to raise its required offset while
+GPU utilisation is at least 10% or power is at least 50 W; the default is
+`MEDIUM`. These are sampled readings, and some encoder workloads do not cross
+either threshold. Choose an idle floor and temperature policy that also cover
+those workloads and the time needed for telemetry and fans to respond.
+
 Create one high-entropy token per guest, transfer it securely to that guest,
 and restrict the files to the account running each service:
 

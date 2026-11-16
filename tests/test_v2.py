@@ -86,6 +86,22 @@ class DecisionTests(unittest.TestCase):
         self.reg.accept("guest", payload(2, session, temp=40, slow=None))
         self.assertEqual(desired_level(self.cfg, self.reg, {100: "running"}, Level.LOW)[0], Level.MAX)
 
+    def test_active_minimum_can_raise_fans_before_gpu_heats(self):
+        session = self.reg.new_session("guest")
+        idle = payload(0, session, temp=44)
+        self.reg.accept("guest", idle)
+        client = self.cfg["clients"][0]
+        client["active_minimum_level"] = "MAX"
+        self.assertEqual(desired_level(self.cfg, self.reg, {100: "running"}, Level.LOW)[0], Level.LOW)
+        busy = payload(1, session, temp=44)
+        busy["gpus"][0]["utilisation"] = 10
+        self.reg.accept("guest", busy)
+        self.assertEqual(desired_level(self.cfg, self.reg, {100: "running"}, Level.LOW)[0], Level.MAX)
+        busy = payload(2, session, temp=44)
+        busy["gpus"][0]["power"] = 50
+        self.reg.accept("guest", busy)
+        self.assertEqual(desired_level(self.cfg, self.reg, {100: "running"}, Level.LOW)[0], Level.MAX)
+
     def test_remote_vm_is_unknown_not_stopped(self):
         response = mock.Mock(stdout=json.dumps([{"type": "qemu", "vmid": 100,
                                                   "status": "running", "node": "other"}]))

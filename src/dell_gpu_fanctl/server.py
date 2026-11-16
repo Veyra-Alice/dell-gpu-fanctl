@@ -50,6 +50,7 @@ def read_config(path: str) -> dict:
         if not 50 <= target <= 85:
             raise ValueError("target temperature must be 50–85 C")
         client["_target"] = target
+        Level[str(client.get("active_minimum_level", "MEDIUM")).upper()]
     if not 5 <= float(cfg.get("stale_seconds", 15)) <= 120:
         raise ValueError("invalid telemetry timeout")
     if not 5 <= float(cfg.get("cycle_seconds", 5)) <= 60:
@@ -104,7 +105,10 @@ def desired_level(cfg: dict, registry: Registry, states: dict[int, str], current
             reading = Reading(gpu.temperature, gpu.utilisation >= 10 or gpu.power >= 50,
                               gpu.thermal_slowdown, gpu.uuid)
             desired = max(desired, apply_hysteresis(current, reading, client["_target"]))
-            reasons.append(f"{client['name']}/{gpu.uuid}: {gpu.temperature:g} C")
+            if reading.active:
+                desired = max(desired, Level[str(client.get("active_minimum_level", "MEDIUM")).upper()])
+            reasons.append(f"{client['name']}/{gpu.uuid}: {gpu.temperature:g} C, "
+                           f"{gpu.utilisation:g}%, {gpu.power:g} W")
     return desired, "; ".join(reasons) or "no configured clients"
 
 

@@ -21,6 +21,11 @@ No configured clients is a valid idle state. Set a minimum offset appropriate
 to the chassis, including powered but idle passive GPUs; the shipped default
 is maximum. Temperatures, active GPU demand and hysteresis determine requests
 above that minimum. Reductions wait for a cooldown and fan writes are read back.
+Each client may also set `active_minimum_level` (default `MEDIUM`) to raise
+the fans as soon as reported GPU utilisation reaches 10% or power reaches 50 W.
+This anticipatory floor does not detect every workload: for example, NVENC
+can be active below both thresholds, so measured temperature and a validated
+physical idle floor remain necessary.
 Cluster and local VM status must agree; either can still change immediately
 after a check. The measured idle floor must provide enough airflow while a VM
 starts and the controller detects it. There is no VM-start interlock in v2.
