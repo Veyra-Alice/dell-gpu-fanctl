@@ -12,7 +12,7 @@ from unittest import mock
 
 from dell_gpu_fanctl.collector import Sender, read_nvidia
 from dell_gpu_fanctl.controller import Level
-from dell_gpu_fanctl.hardware import Racadm, parse_sensors
+from dell_gpu_fanctl.hardware import InletTooHot, Racadm, parse_sensors
 from dell_gpu_fanctl.protocol import Registry, parse_sample
 from dell_gpu_fanctl.server import FanLoop, desired_level, handler_for, vm_states
 
@@ -140,6 +140,53 @@ class HardwareTests(unittest.TestCase):
                 hw.set_verified(Level.MAX)
         with mock.patch.object(hw, "command", side_effect=["", "FanSpeedOffset=Max Fan Speed"]):
             hw.set_verified(Level.MAX)
+
+    def test_hot_inlet_retains_maximum_and_reports_gpu(self):
+        reg = Registry({"guest": {"GPU-a"}}, clock=lambda: 100)
+        session = reg.new_session("guest")
+        reg.accept("guest", payload(0, session, temp=49))
+        cfg = {"minimum_level": "LOW", "stale_seconds": 15,
+               "clients": [{"name": "guest", "vm_id": 100, "_target": 80}]}
+        hw = mock.Mock()
+        hw.offset.return_value = Level.MEDIUM
+        hw.health.side_effect = InletTooHot(40, {"fan": 17000})
+        loop = FanLoop(cfg, reg, hw, True)
+        loop.last_confirmed = Level.MEDIUM
+        events = []
+        hw.set_verified.side_effect = lambda level: events.append(("set", level))
+        def states(_cfg):
+            events.append(("read_vm", None))
+            return {100: "running"}
+        with mock.patch("dell_gpu_fanctl.server.vm_states", side_effect=states):
+            with self.assertLogs(level="INFO") as log:
+                loop.cycle()
+        hw.set_verified.assert_called_once_with(Level.MAX)
+        self.assertEqual(events, [("set", Level.MAX), ("read_vm", None)])
+        self.assertTrue(any("inlet at or above limit" in line and "49 C" in line for line in log.output))
+
+    def test_hot_inlet_cannot_hide_bad_fan(self):
+        output = SENSORS.replace("37C", "40C").replace("17040RPM", "0RPM")
+        with self.assertRaises(ValueError) as caught:
+            parse_sensors(output, ["System Board Fan1", "System Board Fan2"], 40)
+        self.assertNotIsInstance(caught.exception, InletTooHot)
+
+    def test_cooling_after_hot_inlet_obeys_lower_delay(self):
+        now = [0.0]
+        reg = Registry({"guest": {"GPU-a"}}, clock=lambda: now[0])
+        session = reg.new_session("guest")
+        cfg = {"minimum_level": "LOW", "stale_seconds": 15, "lower_delay_seconds": 60,
+               "clients": [{"name": "guest", "_target": 80}]}
+        hw = mock.Mock()
+        state = [Level.MAX]
+        hw.offset.side_effect = lambda: state[0]
+        hw.health.side_effect = [InletTooHot(40, {"fan": 17000})] + [(39, {"fan": 17000})] * 7
+        hw.set_verified.side_effect = lambda level: state.__setitem__(0, level)
+        loop = FanLoop(cfg, reg, hw, True, clock=lambda: now[0])
+        for second in (0, 10, 20, 30, 40, 50, 60, 70):
+            now[0] = second
+            reg.accept("guest", payload(second, session))
+            loop.cycle()
+            self.assertEqual(state[0], Level.LOW if second == 70 else Level.MAX)
 
     def test_control_cooldown_and_stale_data_restores_max(self):
         now = [0.0]

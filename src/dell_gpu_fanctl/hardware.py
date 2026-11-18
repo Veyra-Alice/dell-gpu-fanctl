@@ -8,6 +8,15 @@ import subprocess
 from .controller import Level, RACADM_VALUE, parse_current_offset
 
 
+class InletTooHot(ValueError):
+    """All sensors are valid, but the inlet requires maximum cooling."""
+
+    def __init__(self, inlet: float, fans: dict[str, int]):
+        super().__init__(f"inlet temperature {inlet:g} C is at or above the configured limit")
+        self.inlet = inlet
+        self.fans = fans
+
+
 class Racadm:
     def __init__(self, binary: str, expected_fans: list[str], inlet_limit: float):
         if not expected_fans or len(set(expected_fans)) != len(expected_fans):
@@ -54,6 +63,8 @@ def parse_sensors(output: str, expected_fans: list[str], inlet_limit: float):
                 if not match or match.group(1).lower() != "ok" or int(match.group(2)) <= 0 or name in fans:
                     raise ValueError(f"fan sensor unhealthy or ambiguous: {name}")
                 fans[name] = int(match.group(2))
-    if inlet is None or not -10 <= inlet < inlet_limit or set(fans) != set(expected_fans):
+    if inlet is None or inlet < -10 or set(fans) != set(expected_fans):
         raise ValueError("inlet or expected fan sensors unavailable or unsafe")
+    if inlet >= inlet_limit:
+        raise InletTooHot(inlet, fans)
     return inlet, fans

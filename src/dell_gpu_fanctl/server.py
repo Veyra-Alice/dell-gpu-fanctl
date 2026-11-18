@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .controller import Level, Reading, apply_hysteresis
-from .hardware import Racadm
+from .hardware import InletTooHot, Racadm
 from .protocol import Registry, number
 
 MAX_BODY = 16384
@@ -189,11 +189,22 @@ class FanLoop:
     def cycle(self):
         try:
             actual = self.hw.offset()
-            inlet, fans = self.hw.health()
+            inlet_hot = False
+            try:
+                inlet, fans = self.hw.health()
+            except InletTooHot as exc:
+                inlet, fans = exc.inlet, exc.fans
+                inlet_hot = True
+                if self.control and actual != Level.MAX:
+                    self.hw.set_verified(Level.MAX)
+                    self.last_confirmed = actual = Level.MAX
             if self.control and actual != self.last_confirmed:
                 raise RuntimeError("unexpected hardware offset; refusing reduction")
             states = vm_states(self.cfg)
             desired, reason = desired_level(self.cfg, self.registry, states, actual)
+            if inlet_hot:
+                desired = Level.MAX
+                reason = f"inlet at or above limit; {reason}"
             if desired < actual:
                 if self.lower_since is None:
                     self.lower_since = self.clock()
